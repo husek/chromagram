@@ -13,26 +13,37 @@ function isUploadedFile(file: UploadedFile | UploadedFile[]): file is UploadedFi
 
 export const getChromagram = async (req: express.Request, res: express.Response) => {
     try {
+        const mapChroma = (chroma: string[], currentResults: any[]) => {
+            const results = [...currentResults];
+            chroma.map((chromaChord, index) => {
+                if (Array.isArray(results[index])) {
+                    results[index].push(chromaChord);
+                } else {
+                    results[index] = [chromaChord];
+                }
+            });
+            return results;
+        };
 
         const audioParser = (audioBuffer: any) => {
             const channelData = audioBuffer.getChannelData(0);
             const BufferRate = 512;
 
-            const results = [];
+            let results: any[] = [];
+
             for (let i = 0; i < channelData.length - BufferRate; i += BufferRate) {
-                const r = meyda.extract("chroma", channelData.slice(i, i + BufferRate));
-                results.push(r);
+                const chroma = meyda.extract("chroma", channelData.slice(i, i + BufferRate));
+                results = mapChroma(chroma, results);
             }
-            // TODO: Map the chroma as a chromagram
-            console.log(results[0].length);
-            console.log(results.length);
+
             res.status(200).send(results);
         };
+
         const errorHandler = (error: any) => {
             res.status(500).send(error.message);
         };
+
         if (!req.files) {
-            console.log(req.files);
             return res.status(400).send("No files were uploaded.");
         }
         if (typeof req.files === "object") {
@@ -56,7 +67,7 @@ export const getChromagram = async (req: express.Request, res: express.Response)
 
             const offlineContext = new AudioContext;
             const sourceBuffer = new Uint8Array(audioFile.data).buffer;
-            const decodedBuffer = offlineContext.decodeAudioData(sourceBuffer, audioParser, errorHandler);
+            offlineContext.decodeAudioData(sourceBuffer, audioParser, errorHandler);
         } else {
             return res.status(400).send(`Multiple files aren't supported at the moment`);
         }
